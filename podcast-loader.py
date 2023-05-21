@@ -21,11 +21,10 @@ if not feedparser_installed:
     subprocess.check_call(['pip', 'install', 'feedparser'])
     print("feedparser library has been installed.")
     
-### ---------- Process feedparser ---------- ###
+#### ---------- Process feedparser ---------- ####
 import feedparser
 import requests
-import os    
-
+import os
 
 def download_episode(url, file_name, episode_num, total_episodes):
     response = requests.get(url, stream=True)
@@ -36,10 +35,11 @@ def download_episode(url, file_name, episode_num, total_episodes):
         for data in response.iter_content(chunk_size=4096):
             file.write(data)
             downloaded_size += len(data)
-            progress = int((downloaded_size / total_size) * 100)
-            print(f"Downloading episode {episode_num} of {total_episodes} - {progress}% complete", end='\r')
+            if total_size > 0:
+                progress = int((downloaded_size / total_size) * 100)
+                print(f"Downloading {file_name} [{episode_num} of {total_episodes}] - {progress}% complete", end='\r')
 
-    print(f"Downloaded episode {episode_num} of {total_episodes}")
+    print(" - Done - ")
 
 def download_podcast_feed(feed_url):
     feed = feedparser.parse(feed_url)
@@ -53,7 +53,7 @@ def download_podcast_feed(feed_url):
         episode_url = entry.enclosures[0].href
         file_name = f"{podcast_title} [{index}] - {episode_title}.mp3"
         episodes.append((index, episode_title, episode_url, file_name))
-    
+
     total_episodes = len(episodes)
 
     print(f"Total episodes: {total_episodes}\n")
@@ -64,20 +64,44 @@ def download_podcast_feed(feed_url):
     print("\n")
 
     # Filter episodes by word or phrase
-    filter_choice = input("Enter a word or phrase to filter episodes (or press Enter to skip): ")
+    filter_choice = input("Enter a word or phrase to filter episodes (or Enter to skip) (or \\ to reverse ordering): ")
     if filter_choice:
-        filtered_episodes = [
-            episode for episode in episodes if filter_choice.lower() in episode[1].lower()
-        ]
-        episodes = filtered_episodes
+        if filter_choice == "\\":
+            episodes = []
+
+            for index, entry in enumerate(feed.entries, start=1):
+                episode_title = entry.title
+                episode_url = entry.enclosures[0].href
+                file_name = f"{podcast_title} - {episode_title}.mp3"
+                episodes.append((index, episode_title, episode_url, file_name))
+
+            total_episodes = len(episodes)
+
+            print(f"Total episodes: {total_episodes}\n")
+
+            for idx, episode in enumerate(episodes, start=1):
+                print(f"{idx}. [{episode[0]}] {episode[1]}")
+
+            print("\n")
+        else:
+            filtered_episodes = [
+                episode for episode in episodes if filter_choice.lower() in episode[1].lower()
+            ]
+            episodes = filtered_episodes
+
+        total_episodes = len(episodes)
 
         print(f"\nFiltered episodes with '{filter_choice}':\n")
-        for idx, episode in enumerate(episodes, start=1):
-            print(f"{idx}. [{episode[0]}] {episode[1]}")
+        if filter_choice == "\\":
+            for idx, episode in enumerate(episodes, start=1):
+                print(f"{idx}. [{idx}] {episode[1]}")
+        else:
+            for idx, episode in enumerate(episodes, start=1):
+                print(f"{idx}. [{total_episodes - idx + 1}] {episode[1]}")
 
         print("\n")
 
-    episode_choice = input("Enter the episode number(s) you want to download (e.g., 1, 3-5, * or a for all) (or 'q' to quit): ")
+    episode_choice = input("Enter the episode number(s) you want to download (e.g., 1,3-5, or * for all) (or 'q' to quit): ")
 
     if episode_choice.lower() == "q":
         print("Quitting...")
